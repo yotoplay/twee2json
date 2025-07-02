@@ -46,15 +46,9 @@
   "devDependencies": {
     "@tsconfig/node20": "^20.1.2",
     "@types/node": "^20.0.0",
-    "@yoto/eslint-config": "bitbucket:yotoplay/yoto-config-eslint#semver:3.0.20",
-    "@yoto/prettier-config": "bitbucket:yotoplay/yoto-config-prettier#semver:2.1.0",
     "eslint": "^9.15.0",
     "prettier": "^3.3.3",
     "typescript": "^5.6.3",
     "vitest": "^3.2.3"
-  },
-  "prettier": "@yoto/prettier-config",
-  "eslintConfig": {
-    "extends": "@yoto/eslint-config"
   }
 }
