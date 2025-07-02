@@ -1,5 +1,5 @@
 {
-  "name": "@yoto/twee2json",
+  "name": "@yotoplay/twee2json",
   "version": "1.0.0",
   "description": "Convert Twine/Twee files to JSON format",
   "main": "dist/index.js",
