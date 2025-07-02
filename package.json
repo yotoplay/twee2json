@@ -1,0 +1,60 @@
+{
+  "name": "@yoto/twee2json",
+  "version": "1.0.0",
+  "description": "Convert Twine/Twee files to JSON format",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && npm run copy-test-data",
+    "copy-test-data": "cp -r __tests__/data dist/__tests__/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "twine",
+    "twee",
+    "json",
+    "converter",
+    "interactive-fiction"
+  ],
+  "author": "Yoto",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yotoplay/twee2json.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yotoplay/twee2json/issues"
+  },
+  "homepage": "https://github.com/yotoplay/twee2json#readme",
+  "devDependencies": {
+    "@tsconfig/node20": "^20.1.2",
+    "@types/node": "^20.0.0",
+    "@yoto/eslint-config": "bitbucket:yotoplay/yoto-config-eslint#semver:3.0.20",
+    "@yoto/prettier-config": "bitbucket:yotoplay/yoto-config-prettier#semver:2.1.0",
+    "eslint": "^9.15.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.3"
+  },
+  "prettier": "@yoto/prettier-config",
+  "eslintConfig": {
+    "extends": "@yoto/eslint-config"
+  }
+}
