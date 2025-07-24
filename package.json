@@ -1,6 +1,6 @@
 {
   "name": "@yotoplay/twee2json",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Convert Twine/Twee files to JSON format",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
