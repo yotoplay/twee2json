@@ -5,6 +5,12 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  id-token: write
+  issues: write
+  pull-requests: write
+
 jobs:
   release:
     name: Release
@@ -24,8 +30,8 @@ jobs:
 
       - name: Setup NPM
         run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
           npm config set access public
+          npm config set provenance true
 
       - name: Install dependencies
         run: npm ci
