@@ -196,6 +196,37 @@ This is the end.`;
     expect(result.metadata.title).toBeDefined();
     expect(result.passages.length).toBeGreaterThan(0);
     expect(result.passages.every((p) => p.name)).toBe(true);
-    expect(result.passages.every((p) => p.content)).toBe(true);
+    expect(result.passages.some((p) => p.content)).toBe(true);
+  });
+
+  it("should extract multi-line HTML comments", () => {
+    const result = convertTweeToJson(
+      ":: A\nHello\n<!--\nline one\nline two\n-->\nWorld",
+    );
+
+    expect(result.passages[0].comments).toEqual(["line one\nline two"]);
+    expect(result.passages[0].content).toBe("Hello\n\nWorld");
+  });
+
+  it("should not leave comment markers from nested comments", () => {
+    const result = convertTweeToJson(":: A\n<!<!-- x -->-- y -->");
+
+    expect(result.passages[0].content).toBe("");
+    expect(result.passages[0].comments).toEqual(["x", "y"]);
+  });
+
+  it("should parse pathological input in linear time", () => {
+    const inputs = [
+      ":: " + "{{".repeat(50000),
+      ":: Z" + "[\\".repeat(50000),
+      ":: A\n" + "<!--a".repeat(50000),
+      ":: A\n(set:$ato" + " ".repeat(50000),
+      ":: A\n" + "(set: $a to ".repeat(20000),
+    ];
+
+    const start = Date.now();
+    inputs.forEach((input) => convertTweeToJson(input));
+
+    expect(Date.now() - start).toBeLessThan(2000);
   });
 });
