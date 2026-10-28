@@ -7,14 +7,10 @@ export function convertTweeToJson(tweeContent: string): TweeJSON {
     init: null,
   };
   let variables: any = {};
-  const passagePattern =
-    /:: ([^\n[]+)\s*((?:\[[^\]]+\]\s*)*)({.*})?\n([\s\S]*?)(?=\n::|$)/g;
-  let match;
-
-  while ((match = passagePattern.exec(tweeContent)) !== null) {
-    const [, name, tagsString, metadataString, content] = match;
-    const passageName = name.replace(/\{[^}]*\}/, "").trim();
-    const tags = extractTags(tagsString);
+  for (const { name, tags, metadataString, content } of parsePassages(
+    tweeContent,
+  )) {
+    const passageName = stripFirstBraceGroup(name).trim();
     const { cleanedContent, choices, comments } = processContent(content);
     const passageVariables = extractVariables(content);
 
@@ -44,25 +40,154 @@ export function convertTweeToJson(tweeContent: string): TweeJSON {
   return { metadata, variables, passages };
 }
 
-function extractTags(tagsString: string): string[] {
-  return [...tagsString.matchAll(/\[([^\]]+)\]/g)]
-    .map((tag) => tag[1].trim().split(" "))
-    .reduce((x, y) => x.concat(y), []);
+function skipWhitespace(text: string, from: number): number {
+  let i = from;
+  while (i < text.length && /\s/.test(text[i])) i++;
+  return i;
+}
+
+function stripFirstBraceGroup(text: string): string {
+  const open = text.indexOf("{");
+  const close = open === -1 ? -1 : text.indexOf("}", open + 1);
+  return close === -1 ? text : text.slice(0, open) + text.slice(close + 1);
+}
+
+function parseHeader(header: string) {
+  const bracket = header.indexOf("[");
+  if (bracket === 0 || header === "") return null;
+
+  const name = bracket === -1 ? header : header.slice(0, bracket);
+  const rest = bracket === -1 ? "" : header.slice(bracket);
+  const tags: string[] = [];
+
+  let i = 0;
+  while (rest[i] === "[") {
+    const close = rest.indexOf("]", i + 1);
+    if (close === -1 || close === i + 1) break;
+    tags.push(
+      ...rest
+        .slice(i + 1, close)
+        .trim()
+        .split(" "),
+    );
+    i = skipWhitespace(rest, close + 1);
+  }
+
+  const tail = rest.slice(i).trimEnd();
+  const metadataString =
+    tail.length > 1 && tail.startsWith("{") && tail.endsWith("}")
+      ? tail
+      : undefined;
+
+  return { name, tags, metadataString };
+}
+
+function parsePassages(tweeContent: string) {
+  const passages: {
+    name: string;
+    tags: string[];
+    metadataString: string | undefined;
+    content: string;
+  }[] = [];
+  let current: {
+    header: ReturnType<typeof parseHeader>;
+    lines: string[];
+  } | null = null;
+
+  const flush = () => {
+    if (current?.header) {
+      passages.push({
+        ...current.header,
+        content: current.lines.join("\n"),
+      });
+    }
+  };
+
+  for (const line of tweeContent.split("\n")) {
+    if (line.startsWith("::")) {
+      flush();
+      current = line.startsWith(":: ")
+        ? { header: parseHeader(line.slice(3)), lines: [] }
+        : null;
+    } else {
+      current?.lines.push(line);
+    }
+  }
+  flush();
+
+  return passages;
+}
+
+function stripHtmlComments(content: string, comments: string[]): string {
+  let result = content;
+  let found = true;
+
+  while (found) {
+    found = false;
+    let output = "";
+    let i = 0;
+    while (true) {
+      const open = result.indexOf("<!--", i);
+      const close = open === -1 ? -1 : result.indexOf("-->", open + 4);
+      if (close === -1) break;
+      comments.push(result.slice(open + 4, close).trim());
+      output += result.slice(i, open);
+      i = close + 3;
+      found = true;
+    }
+    result = output + result.slice(i);
+  }
+
+  return result;
+}
+
+function findSetStatement(line: string) {
+  const end = line.lastIndexOf(")");
+  let from = 0;
+
+  while (end !== -1) {
+    const start = line.indexOf("(set:", from);
+    if (start === -1) break;
+    from = start + 1;
+
+    let i = skipWhitespace(line, start + 5);
+    if (line[i] !== "$") continue;
+    const nameStart = ++i;
+    while (i < line.length && /\w/.test(line[i])) i++;
+    if (i === nameStart) continue;
+    const name = line.slice(nameStart, i);
+
+    i = skipWhitespace(line, i);
+    if (!line.startsWith("to", i)) continue;
+    i = skipWhitespace(line, i + 2);
+    if (end < i) continue;
+
+    return { start, end: end + 1, name, value: line.slice(i, end) };
+  }
+
+  return null;
+}
+
+function stripSetStatements(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => {
+      const statement = findSetStatement(line);
+      return statement
+        ? line.slice(0, statement.start) + line.slice(statement.end)
+        : line;
+    })
+    .join("\n");
 }
 
 function processContent(content: string) {
-  const htmlCommentPattern = /<!--(.*?)-->/g;
-  const setVariablePattern = /\(set:\s*\$(\w+)\s*to\s*(.*)\)/g;
   const printPattern = /\(print:.*?\)/g;
   const comments: string[] = [];
   const choices: any[] = [];
 
-  const cleanedContent = content
-    .replace(htmlCommentPattern, (comment, commentText) => {
-      comments.push(commentText.trim());
-      return "";
-    })
-    .replace(setVariablePattern, "")
+  const cleanedContent = stripSetStatements(
+    stripHtmlComments(content, comments),
+  )
     .replace(printPattern, "")
     .trim();
 
@@ -107,13 +232,14 @@ function extractChoices(content: string, choices: any[]) {
 }
 
 function extractVariables(content: string) {
-  const setVariablePattern = /\(set:\s*\$(\w+)\s*to\s*(.*)\)/g;
   const passageVariables: { [key: string]: any } = {};
 
-  content.replace(setVariablePattern, (setExpr, varName, value) => {
-    passageVariables[varName] = parseValue(value.trim());
-    return "";
-  });
+  for (const line of content.split("\n")) {
+    const statement = findSetStatement(line);
+    if (statement) {
+      passageVariables[statement.name] = parseValue(statement.value.trim());
+    }
+  }
 
   return passageVariables;
 }
